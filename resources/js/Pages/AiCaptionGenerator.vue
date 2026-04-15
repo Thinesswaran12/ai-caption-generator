@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import axios from 'axios'
 
 const topic = ref('')
 const platform = ref('Instagram')
@@ -7,9 +8,12 @@ const tone = ref('Friendly')
 const loading = ref(false)
 const captions = ref([])
 const error = ref('')
+const copiedIndex = ref(null)
 
 const generateCaptions = async () => {
     error.value = ''
+    captions.value = []
+    copiedIndex.value = null
 
     if (!topic.value.trim()) {
         error.value = 'Please enter a topic'
@@ -18,15 +22,33 @@ const generateCaptions = async () => {
 
     loading.value = true
 
-    // fake loading
-    setTimeout(() => {
-        captions.value = [
-            `Start your day with ${topic.value} and a smile.`,
-            `${topic.value} made simple, fresh, and exciting.`,
-            `Discover why everyone is talking about ${topic.value}.`,
-        ]
+    try {
+        const response = await axios.post('/api/ai-caption-generator/generate', {
+            topic: topic.value,
+            platform: platform.value,
+            tone: tone.value,
+        })
+
+        captions.value = response.data.captions ?? []
+    } catch (err) {
+        error.value = 'Something went wrong while generating captions.'
+        console.error(err)
+    } finally {
         loading.value = false
-    }, 1000)
+    }
+}
+
+const copyCaption = async (caption, index) => {
+    try {
+        await navigator.clipboard.writeText(caption)
+        copiedIndex.value = index
+
+        setTimeout(() => {
+            copiedIndex.value = null
+        }, 1500)
+    } catch (err) {
+        console.error('Copy failed', err)
+    }
 }
 </script>
 
@@ -86,7 +108,16 @@ const generateCaptions = async () => {
             </div>
 
             <div v-if="captions.length" class="mt-8">
-                <h2 class="mb-4 text-2xl font-semibold text-gray-900">Generated Captions</h2>
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="text-2xl font-semibold text-gray-900">Generated Captions</h2>
+
+                    <button
+                        @click="generateCaptions"
+                        class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                        Regenerate
+                    </button>
+                </div>
 
                 <div class="space-y-4">
                     <div
@@ -95,6 +126,15 @@ const generateCaptions = async () => {
                         class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-200"
                     >
                         <p class="text-gray-700">{{ caption }}</p>
+
+                        <div class="mt-4 flex justify-end">
+                            <button
+                                @click="copyCaption(caption, index)"
+                                class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
+                            >
+                                {{ copiedIndex === index ? 'Copied!' : 'Copy' }}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
